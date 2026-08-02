@@ -1,10 +1,19 @@
 const screens = {
   menu: document.getElementById('screen-menu'),
   solo: document.getElementById('screen-solo'),
+  interviewCategory: document.getElementById('screen-interview-category'),
   interview: document.getElementById('screen-interview'),
   mpLobby: document.getElementById('screen-mp-lobby'),
   mpGame: document.getElementById('screen-mp-game'),
   mpGameOver: document.getElementById('screen-mp-gameover'),
+};
+
+const DISCIPLINE_LABELS = {
+  mechanical: 'Mechanical',
+  electrical: 'Electrical',
+  software: 'Software',
+  computer: 'Computer Engineering',
+  mixed: 'Mixed',
 };
 
 function showScreen(name) {
@@ -16,12 +25,20 @@ document.querySelectorAll('[data-back]').forEach((btn) => {
   btn.addEventListener('click', () => showScreen('menu'));
 });
 
-document.querySelectorAll('.mode-card').forEach((card) => {
+document.querySelectorAll('.mode-card:not(.discipline-card)').forEach((card) => {
   card.addEventListener('click', () => {
     const mode = card.dataset.mode;
     if (mode === 'solo') { showScreen('solo'); startSolo(); }
-    if (mode === 'interview') { showScreen('interview'); startInterview(); }
+    if (mode === 'interview') { showScreen('interviewCategory'); }
     if (mode === 'multiplayer') { showScreen('mpLobby'); }
+  });
+});
+
+document.querySelectorAll('.discipline-card').forEach((card) => {
+  card.addEventListener('click', () => {
+    const discipline = card.dataset.discipline;
+    showScreen('interview');
+    startInterview(discipline);
   });
 });
 
@@ -44,6 +61,7 @@ function makeQuestionQueue(endpoint, { batchSize = 5, refillAt = 2 } = {}) {
   return {
     items: [],
     askedTopics: [],
+    extraParams: {},
     filling: false,
     async refill() {
       if (this.filling) return;
@@ -52,6 +70,7 @@ function makeQuestionQueue(endpoint, { batchSize = 5, refillAt = 2 } = {}) {
         const { questions } = await postJSON(endpoint, {
           count: batchSize,
           excludeTopics: this.askedTopics.slice(-10),
+          ...this.extraParams,
         });
         for (const q of questions) {
           this.askedTopics.push(q.topic);
@@ -69,9 +88,10 @@ function makeQuestionQueue(endpoint, { batchSize = 5, refillAt = 2 } = {}) {
       }
       return this.items.shift() ?? null;
     },
-    reset() {
+    reset(extraParams = {}) {
       this.items = [];
       this.askedTopics = [];
+      this.extraParams = extraParams;
     },
   };
 }
@@ -146,10 +166,11 @@ document.getElementById('solo-next').addEventListener('click', loadSoloQuestion)
 const interviewState = { count: 0, currentQuestion: null };
 const interviewQueue = makeQuestionQueue('/api/interview/questions');
 
-function startInterview() {
+function startInterview(discipline = 'mixed') {
   interviewState.count = 0;
-  interviewQueue.reset();
+  interviewQueue.reset({ discipline });
   document.getElementById('interview-count').textContent = '0';
+  document.getElementById('interview-discipline-pill').textContent = DISCIPLINE_LABELS[discipline] || 'Mixed';
   loadInterviewQuestion();
 }
 

@@ -42,6 +42,13 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+.screen-subtitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 4px 0 16px;
+  color: var(--text);
+}
+
 .mode-grid {
   display: grid;
   gap: 14px;

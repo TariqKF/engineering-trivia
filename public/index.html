@@ -46,10 +46,46 @@
       <button id="solo-next" class="btn btn-primary" hidden>Next question →</button>
     </section>
 
+    <!-- INTERVIEW: DISCIPLINE SELECT -->
+    <section id="screen-interview-category" class="screen">
+      <div class="topbar">
+        <button class="btn-link" data-back>← Menu</button>
+      </div>
+      <h2 class="screen-subtitle">Pick a discipline</h2>
+      <div class="mode-grid">
+        <button class="mode-card discipline-card" data-discipline="mechanical">
+          <span class="mode-icon">⚙️</span>
+          <span class="mode-title">Mechanical</span>
+          <span class="mode-desc">Thermodynamics, statics/dynamics, materials, machine design.</span>
+        </button>
+        <button class="mode-card discipline-card" data-discipline="electrical">
+          <span class="mode-icon">🔌</span>
+          <span class="mode-title">Electrical</span>
+          <span class="mode-desc">Circuits, power systems, electromagnetics, controls.</span>
+        </button>
+        <button class="mode-card discipline-card" data-discipline="software">
+          <span class="mode-icon">💻</span>
+          <span class="mode-title">Software</span>
+          <span class="mode-desc">Algorithms, system design, databases, architecture.</span>
+        </button>
+        <button class="mode-card discipline-card" data-discipline="computer">
+          <span class="mode-icon">🖥️</span>
+          <span class="mode-title">Computer Engineering</span>
+          <span class="mode-desc">Hybrid EE + CS: embedded systems, digital logic, firmware.</span>
+        </button>
+        <button class="mode-card discipline-card" data-discipline="mixed">
+          <span class="mode-icon">🎲</span>
+          <span class="mode-title">Mixed</span>
+          <span class="mode-desc">A bit of everything, no fixed discipline.</span>
+        </button>
+      </div>
+    </section>
+
     <!-- INTERVIEW -->
     <section id="screen-interview" class="screen">
       <div class="topbar">
         <button class="btn-link" data-back>← Menu</button>
+        <div class="score-pill" id="interview-discipline-pill"></div>
         <div class="score-pill">Answered: <span id="interview-count">0</span></div>
       </div>
       <div id="interview-question-card" class="card question-card">

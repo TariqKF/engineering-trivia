@@ -67,10 +67,21 @@ const INTERVIEW_SCHEMA = {
 
 const INTERVIEW_ARRAY_SCHEMA = { type: Type.ARRAY, items: INTERVIEW_SCHEMA };
 
-async function generateInterviewQuestions(count, excludeTopics = []) {
+const DISCIPLINE_SCOPES = {
+  mechanical: 'mechanical engineering (e.g. thermodynamics, statics and dynamics, materials and manufacturing, machine design, fluid mechanics, HVAC systems)',
+  electrical: 'electrical engineering (e.g. circuit analysis, power systems, electromagnetics, signal processing, control systems)',
+  software: 'software engineering (e.g. algorithms and data structures, system design, databases, distributed systems, software architecture)',
+  computer: 'computer engineering — a hybrid of electrical engineering and computer science (e.g. embedded systems, digital logic design, computer architecture, firmware development, hardware-software co-design)',
+};
+
+async function generateInterviewQuestions(count, excludeTopics = [], discipline = 'mixed') {
+  const scope = DISCIPLINE_SCOPES[discipline];
+  const focus = scope
+    ? `Focus specifically on ${scope}. Every question should clearly belong to this discipline.`
+    : `Cover a mix of different engineering disciplines across the set.`;
   return generateJSON(
     `Write ${count} distinct open-ended technical interview questions a hiring manager might ask an ` +
-      `engineering candidate, each on a different engineering topic. Each should require an explanation, ` +
+      `engineering candidate. ${focus} Each should require an explanation, ` +
       `not a one-word answer (e.g. "Walk me through...", "How would you...", "Explain..."). ` +
       `Avoid these topics if possible: ${excludeTopics.join(', ') || 'none'}.`,
     INTERVIEW_ARRAY_SCHEMA,
@@ -123,8 +134,8 @@ app.post('/api/solo/questions', async (req, res) => {
 
 app.post('/api/interview/questions', async (req, res) => {
   try {
-    const { count = 5, excludeTopics = [] } = req.body ?? {};
-    const questions = await generateInterviewQuestions(Math.min(count, MAX_BATCH), excludeTopics);
+    const { count = 5, excludeTopics = [], discipline } = req.body ?? {};
+    const questions = await generateInterviewQuestions(Math.min(count, MAX_BATCH), excludeTopics, discipline);
     res.json({ questions });
   } catch (err) {
     sendGenerationError(res, err);
