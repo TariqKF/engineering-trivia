@@ -17,18 +17,6 @@ const io = new Server(httpServer);
 
 const roomCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 5);
 
-const ENGINEERING_TOPICS = [
-  'electrical engineering', 'mechanical engineering', 'civil engineering',
-  'software engineering', 'robotics', 'embedded systems', 'materials science',
-  'aerospace engineering', 'control systems', 'computer architecture',
-  'thermodynamics', 'signal processing', 'PCB design', 'famous engineering failures',
-  'famous engineers and inventions',
-];
-
-function randomTopic() {
-  return ENGINEERING_TOPICS[Math.floor(Math.random() * ENGINEERING_TOPICS.length)];
-}
-
 async function generateJSON(prompt, schema) {
   const response = await ai.models.generateContent({
     model: MODEL,
@@ -53,14 +41,18 @@ const TRIVIA_SCHEMA = {
   required: ['topic', 'question', 'choices', 'correctIndex', 'explanation'],
 };
 
-async function generateTriviaQuestion(excludeTopics = [], difficulty = 'medium') {
-  const topic = randomTopic();
+const TRIVIA_ARRAY_SCHEMA = { type: Type.ARRAY, items: TRIVIA_SCHEMA };
+
+async function generateTriviaQuestions(count, excludeTopics = [], difficulty = 'medium') {
   return generateJSON(
-    `Write one ${difficulty}-difficulty multiple-choice engineering trivia question about ${topic}. ` +
-      `Exactly 4 answer choices, only one correct. Keep the question and choices concise. ` +
-      `Provide a one-to-two sentence explanation of the correct answer. ` +
+    `Write ${count} distinct ${difficulty}-difficulty multiple-choice engineering trivia questions, ` +
+      `each on a different engineering topic (electrical, mechanical, civil, software, robotics, ` +
+      `embedded systems, materials science, aerospace, control systems, computer architecture, ` +
+      `thermodynamics, signal processing, PCB design, or engineering history). ` +
+      `Exactly 4 answer choices per question, only one correct. Keep questions and choices concise. ` +
+      `Provide a one-to-two sentence explanation of the correct answer for each. ` +
       `Avoid these topics if possible: ${excludeTopics.join(', ') || 'none'}.`,
-    TRIVIA_SCHEMA,
+    TRIVIA_ARRAY_SCHEMA,
   );
 }
 
@@ -73,14 +65,15 @@ const INTERVIEW_SCHEMA = {
   required: ['topic', 'question'],
 };
 
-async function generateInterviewQuestion(excludeTopics = []) {
-  const topic = randomTopic();
+const INTERVIEW_ARRAY_SCHEMA = { type: Type.ARRAY, items: INTERVIEW_SCHEMA };
+
+async function generateInterviewQuestions(count, excludeTopics = []) {
   return generateJSON(
-    `Write one open-ended technical interview question a hiring manager might ask an engineering ` +
-      `candidate, related to ${topic}. It should require an explanation, not a one-word answer ` +
-      `(e.g. "Walk me through...", "How would you...", "Explain..."). ` +
+    `Write ${count} distinct open-ended technical interview questions a hiring manager might ask an ` +
+      `engineering candidate, each on a different engineering topic. Each should require an explanation, ` +
+      `not a one-word answer (e.g. "Walk me through...", "How would you...", "Explain..."). ` +
       `Avoid these topics if possible: ${excludeTopics.join(', ') || 'none'}.`,
-    INTERVIEW_SCHEMA,
+    INTERVIEW_ARRAY_SCHEMA,
   );
 }
 
@@ -108,25 +101,27 @@ async function evaluateInterviewAnswer(question, answer) {
 
 // ---------- REST endpoints (solo + interview) ----------
 
-app.post('/api/solo/question', async (req, res) => {
+const MAX_BATCH = 10;
+
+app.post('/api/solo/questions', async (req, res) => {
   try {
-    const { excludeTopics = [], difficulty = 'medium' } = req.body ?? {};
-    const question = await generateTriviaQuestion(excludeTopics, difficulty);
-    res.json(question);
+    const { count = 5, excludeTopics = [], difficulty = 'medium' } = req.body ?? {};
+    const questions = await generateTriviaQuestions(Math.min(count, MAX_BATCH), excludeTopics, difficulty);
+    res.json({ questions });
   } catch (err) {
     console.error(err);
-    res.status(502).json({ error: 'Failed to generate question' });
+    res.status(502).json({ error: 'Failed to generate questions' });
   }
 });
 
-app.post('/api/interview/question', async (req, res) => {
+app.post('/api/interview/questions', async (req, res) => {
   try {
-    const { excludeTopics = [] } = req.body ?? {};
-    const question = await generateInterviewQuestion(excludeTopics);
-    res.json(question);
+    const { count = 5, excludeTopics = [] } = req.body ?? {};
+    const questions = await generateInterviewQuestions(Math.min(count, MAX_BATCH), excludeTopics);
+    res.json({ questions });
   } catch (err) {
     console.error(err);
-    res.status(502).json({ error: 'Failed to generate question' });
+    res.status(502).json({ error: 'Failed to generate questions' });
   }
 });
 
@@ -148,6 +143,7 @@ app.post('/api/interview/evaluate', async (req, res) => {
 
 const ROUNDS_PER_GAME = 8;
 const QUESTION_TIME_MS = 20_000;
+const QUEUE_TARGET = 3;
 
 /** @type {Map<string, Room>} */
 const rooms = new Map();
@@ -164,13 +160,33 @@ function makeRoom(hostSocketId, hostName) {
     timer: null,
     askedTopics: [],
     started: false,
+    queue: [],
+    filling: false,
   };
   rooms.set(code, room);
+  fillQueue(room); // start prefetching while players are still in the lobby
   return room;
 }
 
 function publicPlayers(room) {
   return [...room.players.entries()].map(([id, p]) => ({ id, name: p.name, score: p.score }));
+}
+
+async function fillQueue(room, target = QUEUE_TARGET) {
+  const needed = target - room.queue.length;
+  if (needed <= 0 || room.filling || !rooms.has(room.code)) return;
+  room.filling = true;
+  try {
+    const questions = await generateTriviaQuestions(needed, room.askedTopics, 'medium');
+    for (const q of questions) {
+      room.askedTopics.push(q.topic);
+      room.queue.push(q);
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    room.filling = false;
+  }
 }
 
 async function nextRound(room) {
@@ -184,16 +200,16 @@ async function nextRound(room) {
     return;
   }
 
-  let question;
-  try {
-    question = await generateTriviaQuestion(room.askedTopics, 'medium');
-  } catch (err) {
-    console.error(err);
+  if (room.queue.length === 0) {
+    await fillQueue(room, 1); // cold start (e.g. game started before the lobby prefetch finished)
+  }
+  const question = room.queue.shift();
+  if (!question) {
     io.to(room.code).emit('room-error', { message: 'Failed to generate the next question. Try again.' });
     return;
   }
-  room.askedTopics.push(question.topic);
   room.currentQuestion = question;
+  fillQueue(room); // top the buffer back off in the background for future rounds
 
   io.to(room.code).emit('question', {
     round: room.round,

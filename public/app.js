@@ -35,13 +35,55 @@ async function postJSON(url, body) {
   return res.json();
 }
 
+// ---------------- QUESTION PREFETCH QUEUE ----------------
+// Keeps a buffer of pre-generated questions per mode so "next" is instant most
+// of the time: once the buffer drops to `refillAt`, a background request tops
+// it back up to `batchSize` while the remaining buffered questions keep serving.
+
+function makeQuestionQueue(endpoint, { batchSize = 5, refillAt = 2 } = {}) {
+  return {
+    items: [],
+    askedTopics: [],
+    filling: false,
+    async refill() {
+      if (this.filling) return;
+      this.filling = true;
+      try {
+        const { questions } = await postJSON(endpoint, {
+          count: batchSize,
+          excludeTopics: this.askedTopics.slice(-10),
+        });
+        for (const q of questions) {
+          this.askedTopics.push(q.topic);
+          this.items.push(q);
+        }
+      } finally {
+        this.filling = false;
+      }
+    },
+    async take() {
+      if (this.items.length === 0) {
+        await this.refill(); // nothing buffered yet — this one has to wait
+      } else if (this.items.length <= refillAt) {
+        this.refill(); // fire-and-forget top-up while serving from the buffer
+      }
+      return this.items.shift() ?? null;
+    },
+    reset() {
+      this.items = [];
+      this.askedTopics = [];
+    },
+  };
+}
+
 // ---------------- SOLO MODE ----------------
 
-const soloState = { score: 0, askedTopics: [] };
+const soloState = { score: 0 };
+const soloQueue = makeQuestionQueue('/api/solo/questions');
 
 function startSolo() {
   soloState.score = 0;
-  soloState.askedTopics = [];
+  soloQueue.reset();
   document.getElementById('solo-score').textContent = '0';
   loadSoloQuestion();
 }
@@ -50,16 +92,20 @@ async function loadSoloQuestion() {
   const card = document.getElementById('solo-card');
   const nextBtn = document.getElementById('solo-next');
   nextBtn.hidden = true;
-  card.innerHTML = '<div class="loading">Loading question…</div>';
+  if (soloQueue.items.length === 0) {
+    card.innerHTML = '<div class="loading">Loading question…</div>';
+  }
 
   let q;
   try {
-    q = await postJSON('/api/solo/question', { excludeTopics: soloState.askedTopics.slice(-5) });
+    q = await soloQueue.take();
   } catch (err) {
+    q = null;
+  }
+  if (!q) {
     card.innerHTML = `<div class="loading">Couldn't load a question. <button class="btn-link" onclick="loadSoloQuestion()">Retry</button></div>`;
     return;
   }
-  soloState.askedTopics.push(q.topic);
   renderSoloQuestion(q);
 }
 window.loadSoloQuestion = loadSoloQuestion;
@@ -96,11 +142,12 @@ document.getElementById('solo-next').addEventListener('click', loadSoloQuestion)
 
 // ---------------- INTERVIEW MODE ----------------
 
-const interviewState = { count: 0, askedTopics: [], currentQuestion: null };
+const interviewState = { count: 0, currentQuestion: null };
+const interviewQueue = makeQuestionQueue('/api/interview/questions');
 
 function startInterview() {
   interviewState.count = 0;
-  interviewState.askedTopics = [];
+  interviewQueue.reset();
   document.getElementById('interview-count').textContent = '0';
   loadInterviewQuestion();
 }
@@ -115,16 +162,20 @@ async function loadInterviewQuestion() {
   feedbackCard.hidden = true;
   answerArea.hidden = true;
   document.getElementById('interview-answer').value = '';
-  card.innerHTML = '<div class="loading">Loading question…</div>';
+  if (interviewQueue.items.length === 0) {
+    card.innerHTML = '<div class="loading">Loading question…</div>';
+  }
 
   let q;
   try {
-    q = await postJSON('/api/interview/question', { excludeTopics: interviewState.askedTopics.slice(-5) });
+    q = await interviewQueue.take();
   } catch (err) {
+    q = null;
+  }
+  if (!q) {
     card.innerHTML = `<div class="loading">Couldn't load a question. <button class="btn-link" onclick="loadInterviewQuestion()">Retry</button></div>`;
     return;
   }
-  interviewState.askedTopics.push(q.topic);
   interviewState.currentQuestion = q.question;
   card.innerHTML = `
     <div class="topic">${escapeHtml(q.topic)}</div>
