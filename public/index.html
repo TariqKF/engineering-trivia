@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Engineering Trivia</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>⚙️ Engineering Trivia</h1>
+      <p class="subtitle">AI-generated questions. Solo, interview prep, or with friends.</p>
+    </header>
+
+    <!-- MENU -->
+    <section id="screen-menu" class="screen active">
+      <div class="mode-grid">
+        <button class="mode-card" data-mode="solo">
+          <span class="mode-icon">🎯</span>
+          <span class="mode-title">Solo</span>
+          <span class="mode-desc">Answer multiple-choice questions at your own pace.</span>
+        </button>
+        <button class="mode-card" data-mode="interview">
+          <span class="mode-icon">🧑‍💼</span>
+          <span class="mode-title">Interview Prep</span>
+          <span class="mode-desc">Open-ended technical interview questions with AI feedback.</span>
+        </button>
+        <button class="mode-card" data-mode="multiplayer">
+          <span class="mode-icon">👥</span>
+          <span class="mode-title">Multiplayer</span>
+          <span class="mode-desc">Create or join a room and race friends on the same questions.</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- SOLO -->
+    <section id="screen-solo" class="screen">
+      <div class="topbar">
+        <button class="btn-link" data-back>← Menu</button>
+        <div class="score-pill">Score: <span id="solo-score">0</span></div>
+      </div>
+      <div id="solo-card" class="card question-card">
+        <div class="loading">Loading question…</div>
+      </div>
+      <button id="solo-next" class="btn btn-primary" hidden>Next question →</button>
+    </section>
+
+    <!-- INTERVIEW -->
+    <section id="screen-interview" class="screen">
+      <div class="topbar">
+        <button class="btn-link" data-back>← Menu</button>
+        <div class="score-pill">Answered: <span id="interview-count">0</span></div>
+      </div>
+      <div id="interview-question-card" class="card question-card">
+        <div class="loading">Loading question…</div>
+      </div>
+      <div id="interview-answer-area" hidden>
+        <textarea id="interview-answer" rows="5" placeholder="Type your answer as you'd say it out loud…"></textarea>
+        <button id="interview-submit" class="btn btn-primary">Submit answer</button>
+      </div>
+      <div id="interview-feedback" class="card feedback-card" hidden></div>
+      <button id="interview-next" class="btn btn-primary" hidden>Next question →</button>
+    </section>
+
+    <!-- MULTIPLAYER: LOBBY -->
+    <section id="screen-mp-lobby" class="screen">
+      <div class="topbar">
+        <button class="btn-link" data-back>← Menu</button>
+      </div>
+      <div id="mp-choice" class="card">
+        <label class="field">
+          <span>Your name</span>
+          <input id="mp-name" type="text" maxlength="20" placeholder="e.g. Tariq" />
+        </label>
+        <div class="mp-actions">
+          <button id="mp-create" class="btn btn-primary">Create room</button>
+          <div class="join-row">
+            <input id="mp-code" type="text" maxlength="5" placeholder="ROOM CODE" style="text-transform:uppercase" />
+            <button id="mp-join" class="btn btn-secondary">Join</button>
+          </div>
+        </div>
+        <p id="mp-error" class="error-text"></p>
+      </div>
+
+      <div id="mp-room" class="card" hidden>
+        <div class="room-code-display">Room code: <strong id="mp-room-code"></strong></div>
+        <ul id="mp-player-list" class="player-list"></ul>
+        <button id="mp-start" class="btn btn-primary" hidden>Start game</button>
+        <p class="hint" id="mp-waiting-hint">Waiting for host to start…</p>
+      </div>
+    </section>
+
+    <!-- MULTIPLAYER: GAME -->
+    <section id="screen-mp-game" class="screen">
+      <div class="topbar">
+        <div class="score-pill">Round <span id="mp-round">1</span>/<span id="mp-total-rounds">8</span></div>
+        <div class="timer-pill">⏱ <span id="mp-timer">20</span>s</div>
+      </div>
+      <div id="mp-question-card" class="card question-card"></div>
+      <div id="mp-reveal" class="card feedback-card" hidden></div>
+      <ol id="mp-leaderboard" class="leaderboard" hidden></ol>
+    </section>
+
+    <!-- MULTIPLAYER: GAME OVER -->
+    <section id="screen-mp-gameover" class="screen">
+      <h2>🏁 Final results</h2>
+      <ol id="mp-final-leaderboard" class="leaderboard"></ol>
+      <button class="btn btn-primary" data-back>Back to menu</button>
+    </section>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
