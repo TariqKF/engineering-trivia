@@ -6,7 +6,7 @@ import { customAlphabet } from 'nanoid';
 import { GoogleGenAI, Type } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const MODEL = 'gemini-3.6-flash';
+const MODEL = 'gemini-3.1-flash-lite';
 
 const app = express();
 app.use(express.json());
@@ -103,14 +103,21 @@ async function evaluateInterviewAnswer(question, answer) {
 
 const MAX_BATCH = 10;
 
+function sendGenerationError(res, err) {
+  console.error(err);
+  if (err?.status === 429) {
+    return res.status(429).json({ error: "Hit the Gemini free-tier rate limit — wait a bit and try again." });
+  }
+  res.status(502).json({ error: 'Failed to generate questions' });
+}
+
 app.post('/api/solo/questions', async (req, res) => {
   try {
     const { count = 5, excludeTopics = [], difficulty = 'medium' } = req.body ?? {};
     const questions = await generateTriviaQuestions(Math.min(count, MAX_BATCH), excludeTopics, difficulty);
     res.json({ questions });
   } catch (err) {
-    console.error(err);
-    res.status(502).json({ error: 'Failed to generate questions' });
+    sendGenerationError(res, err);
   }
 });
 
@@ -120,8 +127,7 @@ app.post('/api/interview/questions', async (req, res) => {
     const questions = await generateInterviewQuestions(Math.min(count, MAX_BATCH), excludeTopics);
     res.json({ questions });
   } catch (err) {
-    console.error(err);
-    res.status(502).json({ error: 'Failed to generate questions' });
+    sendGenerationError(res, err);
   }
 });
 

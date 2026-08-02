@@ -100,7 +100,8 @@ async function loadSoloQuestion() {
   try {
     q = await soloQueue.take();
   } catch (err) {
-    q = null;
+    card.innerHTML = `<div class="loading">${escapeHtml(err.message)} <button class="btn-link" onclick="loadSoloQuestion()">Retry</button></div>`;
+    return;
   }
   if (!q) {
     card.innerHTML = `<div class="loading">Couldn't load a question. <button class="btn-link" onclick="loadSoloQuestion()">Retry</button></div>`;
@@ -170,7 +171,8 @@ async function loadInterviewQuestion() {
   try {
     q = await interviewQueue.take();
   } catch (err) {
-    q = null;
+    card.innerHTML = `<div class="loading">${escapeHtml(err.message)} <button class="btn-link" onclick="loadInterviewQuestion()">Retry</button></div>`;
+    return;
   }
   if (!q) {
     card.innerHTML = `<div class="loading">Couldn't load a question. <button class="btn-link" onclick="loadInterviewQuestion()">Retry</button></div>`;
